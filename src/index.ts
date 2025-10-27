@@ -1,6 +1,7 @@
 import { loadConfig } from "./config";
 import { AudioManager } from "./audio/audio-manager";
 import { ConversationStateMachine, ConversationPhase } from "./state";
+import { LLMCoordinator } from "./llm";
 
 async function main() {
   const config = loadConfig();
@@ -8,10 +9,18 @@ async function main() {
   console.log("🔮 Tarot Card Reader - Starting up...");
   console.log(`Demo Mode: ${config.demoMode}`);
   console.log(`Debug: ${config.debug}`);
+  console.log(
+    `Supervisor: ${config.supervisorEnabled ? "Enabled" : "Disabled"}`,
+  );
 
   // Initialize components
   const audioManager = new AudioManager(config.elevenlabsKey, config.demoMode);
   const stateMachine = new ConversationStateMachine();
+  const llmCoordinator = new LLMCoordinator(
+    config.cerebrasKey,
+    config.openaiKey,
+    config.supervisorEnabled,
+  );
 
   if (config.demoMode) {
     await audioManager.demonstrateFlow();
@@ -43,12 +52,20 @@ async function main() {
       if (currentState.phase === ConversationPhase.READING) {
         const profile = currentState.profile;
         const card = currentState.card;
-        await audioManager.speak(
-          `Your card is ${card?.name}. As a ${profile.element} person who prefers ` +
-            `${profile.timePreference} and follows their ${profile.decisionStyle}, ` +
-            `with a ${profile.lifeStyle} lifestyle focusing on ${profile.focusArea}, ` +
-            `this card suggests: ${card?.meaning_up}`,
-        );
+
+        if (card) {
+          // Generate AI-powered reading using LLM Coordinator
+          console.log("\n[Generating personalized reading...]");
+          const reading = await llmCoordinator.generateReading(
+            profile,
+            card,
+            true,
+          );
+
+          await audioManager.speak(reading);
+          stateMachine.addToTranscript("assistant", reading);
+        }
+
         stateMachine.completeReading();
         continue;
       }
@@ -81,8 +98,9 @@ async function main() {
       }
     }
 
-    console.log("\n✨ Phase 3 State Machine test complete!\n");
+    console.log("\n✨ Phase 4 LLM Integration test complete!\n");
     console.log("Final profile:", stateMachine.getState().profile);
+    console.log("\nReading delivered with AI-powered personalization!");
   } catch (error) {
     console.error("Error during conversation:", error);
   } finally {
