@@ -2,6 +2,7 @@ import { loadConfig } from "./config";
 import { AudioManager } from "./audio/audio-manager";
 import { ConversationStateMachine, ConversationPhase } from "./state";
 import { LLMCoordinator } from "./llm";
+import { TarotAPIClient } from "./tarot";
 
 async function main() {
   const config = loadConfig();
@@ -21,6 +22,7 @@ async function main() {
     config.openaiKey,
     config.supervisorEnabled,
   );
+  const tarotClient = new TarotAPIClient();
 
   if (config.demoMode) {
     await audioManager.demonstrateFlow();
@@ -37,15 +39,16 @@ async function main() {
       // Skip certain phases that don't need user input
       if (currentState.phase === ConversationPhase.CARD_PULL) {
         await audioManager.speak("Drawing your card now...");
-        // Mock card for testing - will be replaced in Phase 5
-        const mockCard = {
-          name: "The Fool",
-          arcana: "Major" as const,
-          meaning_up: "New beginnings, optimism, trust in life",
-          meaning_rev: "Recklessness, taken advantage of, inconsideration",
-          desc: "The Fool is a card of new beginnings, opportunity and potential.",
-        };
-        stateMachine.setCard(mockCard);
+
+        // Draw a real card from the Tarot API
+        console.log("\n[Connecting to Tarot API...]");
+        const card = await tarotClient.drawRandomCard();
+
+        // Display the card beautifully
+        console.log("\n" + tarotClient.formatCardForDisplay(card));
+        console.log(`\n📋 ${tarotClient.getCardSummary(card)}\n`);
+
+        stateMachine.setCard(card);
         continue;
       }
 
@@ -98,9 +101,11 @@ async function main() {
       }
     }
 
-    console.log("\n✨ Phase 4 LLM Integration test complete!\n");
+    console.log("\n✨ Phase 5 Tarot API Integration test complete!\n");
     console.log("Final profile:", stateMachine.getState().profile);
-    console.log("\nReading delivered with AI-powered personalization!");
+    console.log(
+      "\nReading delivered with real tarot cards and AI personalization!",
+    );
   } catch (error) {
     console.error("Error during conversation:", error);
   } finally {
