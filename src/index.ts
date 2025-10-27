@@ -3,6 +3,7 @@ import { AudioManager } from "./audio/audio-manager";
 import { ConversationStateMachine, ConversationPhase } from "./state";
 import { LLMCoordinator } from "./llm";
 import { TarotAPIClient } from "./tarot";
+import { LatencyOptimizer } from "./utils";
 
 async function main() {
   const config = loadConfig();
@@ -23,6 +24,10 @@ async function main() {
     config.supervisorEnabled,
   );
   const tarotClient = new TarotAPIClient();
+  const latencyOptimizer = new LatencyOptimizer(audioManager);
+
+  // Preload resources for better performance
+  await latencyOptimizer.preloadResources();
 
   if (config.demoMode) {
     await audioManager.demonstrateFlow();
@@ -40,9 +45,12 @@ async function main() {
       if (currentState.phase === ConversationPhase.CARD_PULL) {
         await audioManager.speak("Drawing your card now...");
 
-        // Draw a real card from the Tarot API
+        // Draw a real card from the Tarot API with latency optimization
         console.log("\n[Connecting to Tarot API...]");
-        const card = await tarotClient.drawRandomCard();
+        const card = await latencyOptimizer.waitWithFiller(
+          tarotClient.drawRandomCard(),
+          "card-draw",
+        );
 
         // Display the card beautifully
         console.log("\n" + tarotClient.formatCardForDisplay(card));
@@ -57,12 +65,11 @@ async function main() {
         const card = currentState.card;
 
         if (card) {
-          // Generate AI-powered reading using LLM Coordinator
+          // Generate AI-powered reading using LLM Coordinator with latency optimization
           console.log("\n[Generating personalized reading...]");
-          const reading = await llmCoordinator.generateReading(
-            profile,
-            card,
-            true,
+          const reading = await latencyOptimizer.waitWithFiller(
+            llmCoordinator.generateReading(profile, card, true),
+            "reading-generation",
           );
 
           await audioManager.speak(reading);
@@ -101,11 +108,11 @@ async function main() {
       }
     }
 
-    console.log("\n✨ Phase 5 Tarot API Integration test complete!\n");
-    console.log("Final profile:", stateMachine.getState().profile);
     console.log(
-      "\nReading delivered with real tarot cards and AI personalization!",
+      "\n✨ Phase 6 Interruption & Latency Optimization test complete!\n",
     );
+    console.log("Final profile:", stateMachine.getState().profile);
+    console.log("\nReading delivered with optimized latency and filler words!");
   } catch (error) {
     console.error("Error during conversation:", error);
   } finally {
